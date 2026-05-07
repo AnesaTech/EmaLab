@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-ish Solar System (HTML + CSS only)</title>
+    <style>
+        :root {
+            /* visual sizes (vh unit) */
+            --sun-size: 16vh;
+            --p-mercury: 0.9vh;
+            --p-venus: 1.5vh;
+            --p-earth: 1.8vh;
+            --p-mars: 1.2vh;
+            --p-jupiter: 6.2vh;
+            --p-saturn: 5vh;
+            --p-uranus: 3vh;
+            --p-neptune: 2.9vh;
+
+            /* orbit radii */
+            --r-mercury: 11vh;
+            --r-venus: 15vh;
+            --r-earth: 19vh;
+            --r-mars: 23vh;
+            --r-jupiter: 36vh;
+            --r-saturn: 48vh;
+            --r-uranus: 58vh;
+            --r-neptune: 68vh;
+
+            /* rotation times */
+            --t-mercury: 2.4s;
+            --t-venus: 6.1s;
+            --t-earth: 10s;
+            --t-mars: 18.8s;
+            --t-jupiter: 118s;
+            --t-saturn: 294s;
+            --t-uranus: 840s;
+            --t-neptune: 1640s;
+
+            --speed-scale: 1;
+
+            /* UI sizes */
+            --label-size: 1.4vh;
+            --orbit-stroke: 0.06vh;
+            --ring-thickness: 0.18vh;
+
+            --sun-size: 18vh;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background: #050b1a;
+            color: white;
+            font-family: system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .space {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 700vh;
+            z-index: 1;
+        }
+
+        /* sun */
+        .sun {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: var(--sun-size);
+            height: var(--sun-size);
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffdf91, #ffb621 40%, #ff8c00 70%, #ff4500 100%);
+            box-shadow: 0 0 8vh rgba(255, 140, 0, 0.4);
+            z-index: 2;
+        }
+
+        /* orbit rings */
+        .orbit {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            border: var(--orbit-stroke) solid rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .orbit-mercury { width: calc(var(--r-mercury) * 2); height: calc(var(--r-mercury) * 2); }
+        .orbit-venus { width: calc(var(--r-venus) * 2); height: calc(var(--r-venus) * 2); }
+        .orbit-earth { width: calc(var(--r-earth) * 2); height: calc(var(--r-earth) * 2); }
+        .orbit-mars { width: calc(var(--r-mars) * 2); height: calc(var(--r-mars) * 2); }
+        .orbit-jupiter { width: calc(var(--r-jupiter) * 2); height: calc(var(--r-jupiter) * 2); }
+        .orbit-saturn { width: calc(var(--r-saturn) * 2); height: calc(var(--r-saturn) * 2); }
+        .orbit-uranus { width: calc(var(--r-uranus) * 2); height: calc(var(--r-uranus) * 2); }
+        .orbit-neptune { width: calc(var(--r-neptune) * 2); height: calc(var(--r-neptune) * 2); }
+
+        /* rotation container */
+        .orbit-wrap {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            animation: rotate-orbit linear infinite;
+        }
+
+        @keyframes rotate-orbit {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* planets */
+        .planet {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+        }
+
+        .label {
+            position: absolute;
+            left: 110%;
+            font-size: var(--label-size);
+            white-space: nowrap;
+            opacity: 0.7;
+        }
+
+        /* specific animations and offsets */
+        .orbit-wrap-mercury { animation-duration: calc(var(--t-mercury) / var(--speed-scale)); width: calc(var(--r-mercury) * 2); height: calc(var(--r-mercury) * 2); }
+        .pos-mercury { transform: translate(-50%, -50%) translateX(var(--r-mercury)); width: var(--p-mercury); height: var(--p-mercury); background: #a5a5a5; }
+
+        .orbit-wrap-venus { animation-duration: calc(var(--t-venus) / var(--speed-scale)); width: calc(var(--r-venus) * 2); height: calc(var(--r-venus) * 2); }
+        .pos-venus { transform: translate(-50%, -50%) translateX(var(--r-venus)); width: var(--p-venus); height: var(--p-venus); background: #e3bb76; }
+
+        .orbit-wrap-earth { animation-duration: calc(var(--t-earth) / var(--speed-scale)); width: calc(var(--r-earth) * 2); height: calc(var(--r-earth) * 2); }
+        .pos-earth { transform: translate(-50%, -50%) translateX(var(--r-earth)); width: var(--p-earth); height: var(--p-earth); background: #2271b3; }
+
+        .orbit-wrap-mars { animation-duration: calc(var(--t-mars) / var(--speed-scale)); width: calc(var(--r-mars) * 2); height: calc(var(--r-mars) * 2); }
+        .pos-mars { transform: translate(-50%, -50%) translateX(var(--r-mars)); width: var(--p-mars); height: var(--p-mars); background: #e27b58; }
+
+        .orbit-wrap-jupiter { animation-duration: calc(var(--t-jupiter) / var(--speed-scale)); width: calc(var(--r-jupiter) * 2); height: calc(var(--r-jupiter) * 2); }
+        .pos-jupiter { transform: translate(-50%, -50%) translateX(var(--r-jupiter)); width: var(--p-jupiter); height: var(--p-jupiter); background: #d39c7e; }
+
+        .orbit-wrap-saturn { animation-duration: calc(var(--t-saturn) / var(--speed-scale)); width: calc(var(--r-saturn) * 2); height: calc(var(--r-saturn) * 2); }
+        .pos-saturn { transform: translate(-50%, -50%) translateX(var(--r-saturn)); width: var(--p-saturn); height: var(--p-saturn); background: #c5ab6e; }
+
+        /* Saturn Rings */
+        .pos-saturn::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 200%;
+            height: 20%;
+            border: var(--ring-thickness) solid rgba(197, 171, 110, 0.4);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) rotateX(75deg);
+        }
+
+        .orbit-wrap-uranus { animation-duration: calc(var(--t-uranus) / var(--speed-scale)); width: calc(var(--r-uranus) * 2); height: calc(var(--r-uranus) * 2); }
+        .pos-uranus { transform: translate(-50%, -50%) translateX(var(--r-uranus)); width: var(--p-uranus); height: var(--p-uranus); background: #b5e3e3; }
+
+        .orbit-wrap-neptune { animation-duration: calc(var(--t-neptune) / var(--speed-scale)); width: calc(var(--r-neptune) * 2); height: calc(var(--r-neptune) * 2); }
+        .pos-neptune { transform: translate(-50%, -50%) translateX(var(--r-neptune)); width: var(--p-neptune); height: var(--p-neptune); background: #6081ff; }
+
+        /* Moon for Earth */
+        .moon-wrap {
+            position: absolute;
+            width: 4vh;
+            height: 4vh;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            animation: rotate-orbit 2s linear infinite;
+        }
+        .moon {
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            width: 0.4vh;
+            height: 0.4vh;
+            background: #eee;
+            border-radius: 50%;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="space">
+        <div class="sun"></div>
+        
+        <!-- Orbits -->
+        <div class="orbit orbit-mercury"></div>
+        <div class="orbit orbit-venus"></div>
+        <div class="orbit orbit-earth"></div>
+        <div class="orbit orbit-mars"></div>
+        <div class="orbit orbit-jupiter"></div>
+        <div class="orbit orbit-saturn"></div>
+        <div class="orbit orbit-uranus"></div>
+        <div class="orbit orbit-neptune"></div>
+
+        <!-- Planets inside rotating wrappers -->
+        <div class="orbit-wrap orbit-wrap-mercury">
+            <div class="planet pos-mercury"><span class="label">Mercury</span></div>
+        </div>
+        <div class="orbit-wrap orbit-wrap-venus">
+            <div class="planet pos-venus"><span class="label">Venus</span></div>
+        </div>
+        <div class="orbit-wrap orbit-wrap-earth">
+            <div class="planet pos-earth">
+                <span class="label">Earth</span>
+                <div class="moon-wrap"><div class="moon"></div></div>
+            </div>
+        </div>
+        <div class="orbit-wrap orbit-wrap-mars">
+            <div class="planet pos-mars"><span class="label">Mars</span></div>
+        </div>
+        <div class="orbit-wrap orbit-wrap-jupiter">
+            <div class="planet pos-jupiter"><span class="label">Jupiter</span></div>
+        </div>
+        <div class="orbit-wrap orbit-wrap-saturn">
+            <div class="planet pos-saturn"><span class="label">Saturn</span></div>
+        </div>
+        <div class="orbit-wrap orbit-wrap-uranus">
+            <div class="planet pos-uranus"><span class="label">Uranus</span></div>
+        </div>
+        <div class="orbit-wrap orbit-wrap-neptune">
+            <div class="planet pos-neptune"><span class="label">Neptune</span></div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Harmonic Oscillator: Cinematic Physics</title>
+    <style>
+        body, html { margin: 0; padding: 0; background: #050508; overflow: hidden; width: 100%; height: 100%; }
+        canvas { display: block; filter: contrast(1.2) brightness(1.1); }
+        #hud {
+            position: absolute; top: 30px; left: 30px;
+            color: #00f2ff; font-family: 'monospace'; font-size: 11px;
+            letter-spacing: 2px; border-left: 2px solid #00f2ff;
+            padding-left: 15px; pointer-events: none;
+            text-shadow: 0 0 10px #00f2ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        OSCILLATORE ARMONICO SEMPLICE // PROTOTIPO V.4<br>
+        CALCOLO VETTORIALE: ATTIVO<br>
+        MATERIALE MASSA: TUNGSTENO RIFLETTENTE
+    </div>
+    <canvas id="c"></canvas>
+
+<script>
+/**
+ * CINEMATIC HARMONIC MOTION
+ * Logic: Sine-based displacement with helical spring projection
+ */
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let w, h, center;
+let frame = 0;
+
+// Costanti Fisiche (Fittizie per l'estetica)
+const freq = 0.04;      // Velocità angolare
+const amp = 150;        // Ampiezza massima
+const springWidth = 30; // Larghezza elica molla
+const coils = 25;       // Numero di spire della molla
+
+function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    center = { x: w / 2, y: h / 2 };
+}
+
+window.onresize = resize;
+resize();
+
+function drawScene() {
+    // Sfondo cinematico con gradiente
+    const bgGrd = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, w);
+    bgGrd.addColorStop(0, '#0a0a15');
+    bgGrd.addColorStop(1, '#000000');
+    ctx.fillStyle = bgGrd;
+    ctx.fillRect(0, 0, w, h);
+
+    // Effetto griglia prospettica sul fondo
+    ctx.strokeStyle = 'rgba(0, 242, 255, 0.05)';
+    ctx.lineWidth = 1;
+    for(let i = 0; i < 20; i++) {
+        let y = h - (i * 40);
+        ctx.beginPath();
+        ctx.moveTo(0, y); ctx.lineTo(w, y);
+        ctx.stroke();
+    }
+
+    // CALCOLO FISICO: Moto Armonico Semplice
+    // x(t) = A * cos(ωt)
+    const displacement = Math.cos(frame * freq) * amp;
+    const baseY = 100; // Punto di ancoraggio molla (soffitto)
+    const massY = center.y + displacement;
+
+    // 1. DISEGNO DELLA MOLLA (Elica Parametrica)
+    ctx.beginPath();
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+
+    const points = 500;
+    for (let i = 0; i <= points; i++) {
+        const t = i / points;
+        // Interpolazione lineare della posizione lungo la molla
+        const currY = baseY + (massY - baseY) * t;
+        
+        // Calcolo elica 3D proiettata in 2D
+        const angle = t * Math.PI * 2 * coils;
+        const currX = center.x + Math.sin(angle) * springWidth;
+        
+        // Shading dinamico della molla basato sulla profondità (finta)
+        const depth = Math.cos(angle); 
+        ctx.strokeStyle = `rgba(100, 100, 120, ${0.3 + (depth + 1) * 0.35})`;
+        ctx.lineWidth = 2 + (depth + 1);
+
+        if (i === 0) ctx.moveTo(currX, currY);
+        else ctx.lineTo(currX, currY);
+        
+        // Disegniamo a segmenti per cambiare il colore/spessore (effetto 3D)
+        if (i % 10 === 0) {
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(currX, currY);
+        }
+    }
+    ctx.stroke();
+
+    // 2. DISEGNO DELL'ANCORAGGIO
+    ctx.fillStyle = '#111';
+    ctx.fillRect(center.x - 50, baseY - 10, 100, 10);
+    ctx.strokeStyle = '#00f2ff';
+    ctx.strokeRect(center.x - 50, baseY - 10, 100, 10);
+
+    // 3. DISEGNO DELLA MASSA (Sfera Metallica Cinematica)
+    const radius = 40;
+    
+    // Ombra a terra dinamica
+    const shadowSize = 1 - (displacement + amp) / (amp * 4);
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.4 * shadowSize})`;
+    ctx.beginPath();
+    ctx.ellipse(center.x, h - 50, radius * 1.5 * shadowSize, 10 * shadowSize, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sfera: Gradienti multipli per realismo
+    const massGrd = ctx.createRadialGradient(
+        center.x - radius/3, massY - radius/3, radius/10,
+        center.x, massY, radius
+    );
+    massGrd.addColorStop(0, '#fff');      // Specular highlight
+    massGrd.addColorStop(0.2, '#aaa');    // Midtones
+    massGrd.addColorStop(0.5, '#333');    // Deep metal
+    massGrd.addColorStop(1, '#050505');   // Rim lighting artificiale
+
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = 'rgba(0, 242, 255, 0.2)';
+    ctx.fillStyle = massGrd;
+    ctx.beginPath();
+    ctx.arc(center.x, massY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Rim light (bagliore sui bordi)
+    ctx.strokeStyle = 'rgba(0, 242, 255, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    frame++;
+    requestAnimationFrame(drawScene);
+}
+
+drawScene();
+</script>
+</body>
+</html>

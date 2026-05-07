@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>NEWTON'S CRADLE: THE ABSOLUTE ANALYTIC</title>
+    <style>
+        body, html { margin: 0; padding: 0; background: #000; overflow: hidden; height: 100%; }
+        canvas { display: block; filter: contrast(1.1) brightness(1.2); }
+        #overlay {
+            position: absolute; top: 30px; left: 30px;
+            color: #fff; font-family: 'Inter', sans-serif; font-weight: 200;
+            letter-spacing: 5px; font-size: 10px; opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div id="overlay">PERFECT_MOMENTUM_TRANSFER // ANALYTIC_MODE</div>
+    <canvas id="c"></canvas>
+
+<script>
+/**
+ * THE ABSOLUTE CRADLE
+ * Pure Analytical Physics Engine
+ */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let w, h, centerX, centerY;
+const num = 5;
+const r = 38; // Raggio sfere
+const len = 350; // Lunghezza cavi
+const maxA = Math.PI / 4; // 45 gradi
+let time = 0;
+
+function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    centerX = w / 2;
+    centerY = h / 2 - 100;
+}
+
+window.onresize = resize;
+resize();
+
+function drawSphere(x, y, angle, isMoving) {
+    // Ombra a terra
+    const shadowY = centerY + len + r + 20;
+    const distFactor = 1 - (y - (centerY + len)) / 100;
+    ctx.fillStyle = `rgba(0,0,0,${0.3 * distFactor})`;
+    ctx.beginPath();
+    ctx.ellipse(x, shadowY, r * distFactor, r * 0.2 * distFactor, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cavo metallico con riflesso
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - Math.sin(angle) * r, y - Math.cos(angle) * r);
+    const anchorX = x - Math.sin(angle) * len;
+    const anchorY = y - Math.cos(angle) * len;
+    ctx.lineTo(anchorX, anchorY);
+    ctx.stroke();
+
+    // Sfera: Effetto Metallo Speculare
+    const g = ctx.createRadialGradient(x - r*0.4, y - r*0.4, r*0.1, x, y, r);
+    g.addColorStop(0, '#fff'); // Riflesso luce
+    g.addColorStop(0.2, '#55acee'); // Tonalità core
+    g.addColorStop(0.5, '#001a33'); // Profondità
+    g.addColorStop(1, '#000'); // Ombra bordo
+
+    ctx.save();
+    if(isMoving) {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#00f2ff';
+    }
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Rim light dinamico
+    ctx.strokeStyle = 'rgba(0, 242, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+}
+
+function render() {
+    ctx.fillStyle = '#050508';
+    ctx.fillRect(0, 0, w, h);
+
+    // Barra superiore
+    ctx.fillStyle = '#111';
+    ctx.fillRect(centerX - r * 6, centerY - 5, r * 12, 10);
+
+    // Logica Analitica: t = tempo, T = periodo
+    // Usiamo una funzione periodica per dividere il moto tra sinistra e destra
+    const cycle = Math.sin(time); 
+    const angle = Math.abs(cycle) * maxA;
+    
+    for (let i = 0; i < num; i++) {
+        const anchorX = centerX + (i - (num - 1) / 2) * (r * 2);
+        let currentAngle = 0;
+        let moving = false;
+
+        if (cycle > 0 && i === 0) {
+            // Sfera sinistra in movimento
+            currentAngle = angle;
+            moving = true;
+        } else if (cycle < 0 && i === num - 1) {
+            // Sfera destra in movimento
+            currentAngle = -angle;
+            moving = true;
+        }
+
+        const x = anchorX + Math.sin(currentAngle) * len;
+        const y = centerY + Math.cos(currentAngle) * len;
+
+        drawSphere(x, y, currentAngle, moving);
+    }
+
+    // Velocità del tempo calibrata per realismo (√g/l)
+    time += 0.045; 
+    requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>RUBIK 3D - ABSOLUTE MATRIX</title>
+    <style>
+        body { margin: 0; background: #050505; overflow: hidden; font-family: 'Courier New', monospace; }
+        #overlay {
+            position: absolute; top: 20px; left: 20px; color: #00ff00;
+            background: rgba(0,20,0,0.8); padding: 15px; border-left: 3px solid #00ff00;
+            font-size: 12px; pointer-events: none; text-shadow: 0 0 5px #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div id="overlay">STATUS: PURE MATH ENGINE<br>FIX: MATRIX ELEMENT ROUNDING</div>
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        let scene, camera, renderer, mainGroup;
+        const cubies = [];
+        const history = [];
+        let isAnimating = false;
+
+        // Ordine materiali: Right, Left, Top, Bottom, Front, Back
+        const COLORS = [0x0000ff, 0x00ff00, 0xffffff, 0xffff00, 0xff0000, 0xff8c00];
+
+        init();
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(6, 6, 9);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const light = new THREE.PointLight(0xffffff, 1.2);
+            light.position.set(10, 10, 10);
+            scene.add(light);
+
+            mainGroup = new THREE.Group();
+            scene.add(mainGroup);
+
+            const geom = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+            for (let x = -1; x <= 1; x++) {
+                for (let y = -1; y <= 1; y++) {
+                    for (let z = -1; z <= 1; z++) {
+                        const mats = COLORS.map(c => new THREE.MeshStandardMaterial({ color: c }));
+                        const cubie = new THREE.Mesh(geom, mats);
+                        cubie.position.set(x, y, z);
+                        mainGroup.add(cubie);
+                        cubies.push(cubie);
+                    }
+                }
+            }
+            
+            // Pausa prima di iniziare
+            setTimeout(hyperShuffle, 1000);
+        }
+
+        // Funzione per ripulire le matrici da errori floating point
+        function sanitizeCubie(cubie) {
+            cubie.updateMatrix();
+            const e = cubie.matrix.elements;
+            for (let i = 0; i < 16; i++) {
+                e[i] = Math.round(e[i]);
+            }
+            cubie.matrix.decompose(cubie.position, cubie.quaternion, cubie.scale);
+        }
+
+        function hyperShuffle() {
+            const axes = ['x', 'y', 'z'];
+            const layers = [-1, 0, 1];
+            
+            for (let i = 0; i < 40; i++) {
+                const move = {
+                    axis: axes[Math.floor(Math.random() * 3)],
+                    layer: layers[Math.floor(Math.random() * 3)],
+                    angle: (Math.random() > 0.5 ? 1 : -1) * Math.PI / 2
+                };
+                history.push(move);
+                
+                const axisVec = new THREE.Vector3();
+                axisVec[move.axis] = 1;
+                const mRot = new THREE.Matrix4().makeRotationAxis(axisVec, move.angle);
+                const qRot = new THREE.Quaternion().setFromAxisAngle(axisVec, move.angle);
+
+                cubies.forEach(c => {
+                    if (Math.round(c.position[move.axis]) === move.layer) {
+                        c.position.applyMatrix4(mRot);
+                        c.quaternion.premultiply(qRot); // Nota: premultiply è corretto per rotazioni globali
+                        sanitizeCubie(c); // Pulisce istantaneamente la pos/rot
+                    }
+                });
+            }
+            
+            setTimeout(startSolving, 1000);
+        }
+
+        function startSolving() {
+            if (history.length === 0) {
+                // Loop
+                setTimeout(hyperShuffle, 2500);
+                return;
+            }
+            const move = history.pop();
+            animateMove(move.axis, move.layer, -move.angle);
+        }
+
+        function animateMove(axis, layer, angle) {
+            isAnimating = true;
+            const axisVec = new THREE.Vector3();
+            axisVec[axis] = 1;
+
+            const targets = cubies.filter(c => Math.round(c.position[axis]) === layer);
+
+            // Salviamo lo stato di partenza esatto
+            const startStates = targets.map(t => ({
+                pos: t.position.clone(),
+                quat: t.quaternion.clone()
+            }));
+
+            const duration = 12; // frame di animazione
+            let frame = 0;
+
+            function stepAnim() {
+                frame++;
+                const progress = frame / duration;
+                const currentAngle = angle * progress;
+
+                const mRot = new THREE.Matrix4().makeRotationAxis(axisVec, currentAngle);
+                const qRot = new THREE.Quaternion().setFromAxisAngle(axisVec, currentAngle);
+
+                targets.forEach((t, i) => {
+                    // Applichiamo la rotazione sempre partendo dallo stato iniziale pulito
+                    t.position.copy(startStates[i].pos).applyMatrix4(mRot);
+                    t.quaternion.copy(qRot).multiply(startStates[i].quat); 
+                });
+
+                if (frame >= duration) {
+                    // ALLA FINE: Arrotondamento forzato della matrice
+                    targets.forEach(t => sanitizeCubie(t));
+                    isAnimating = false;
+                    startSolving();
+                } else {
+                    requestAnimationFrame(stepAnim);
+                }
+            }
+            stepAnim();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!isAnimating) {
+                mainGroup.rotation.y += 0.005;
+                mainGroup.rotation.x += 0.003;
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.onresize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+    </script>
+</body>
+</html>

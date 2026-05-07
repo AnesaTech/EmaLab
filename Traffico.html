@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mega City Grid Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #050505;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        canvas {
+            background: #0a0a0a;
+            box-shadow: 0 0 100px rgba(0,0,0,0.9);
+            border: 1px solid #222;
+        }
+        .ui {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            color: #00ffcc;
+            pointer-events: none;
+            z-index: 10;
+        }
+        h1 { margin: 0; font-size: 24px; letter-spacing: 2px; }
+        p { color: #888; margin: 5px 0; }
+    </style>
+</head>
+<body>
+
+<div class="ui">
+    <h1>URBAN GRID AI</h1>
+    <p>Simulazione Multi-Incrocio | Bug Cimitero Risolto & Pazienza Dinamica</p>
+</div>
+<canvas id="simCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = 1000;
+canvas.height = 1000;
+
+const ROAD_WIDTH = 100;
+const CAR_WIDTH = 18;
+const CAR_LENGTH = 35;
+const SPAWN_RATE = 0.04; 
+const MAX_SPEED = 2.8;
+const ACCEL = 0.07;
+const BRAKE_FORCE = 0.2;
+const DETECTION_DIST = 90;
+
+const ROADS_X = [250, 750]; 
+const ROADS_Y = [250, 750];
+
+let cars = [];
+let explosions = [];
+
+class Car {
+    constructor(x, y, dir) {
+        this.x = x;
+        this.y = y;
+        this.dir = dir; // 0: Destra, 1: Giù, 2: Sinistra, 3: Su
+        this.speed = MAX_SPEED;
+        this.width = (dir % 2 === 0) ? CAR_LENGTH : CAR_WIDTH;
+        this.height = (dir % 2 === 0) ? CAR_WIDTH : CAR_LENGTH;
+        this.color = `hsl(${Math.random() * 360}, 80%, 60%)`;
+        this.isBraking = false;
+        
+        // Nuovi parametri di stato
+        this.crashed = false;
+        this.markedForDeletion = false; // Rimuove le auto per evitare code di rottami
+        this.waitTime = 0; 
+        this.patience = 60 + Math.floor(Math.random() * 120); // Pazienza casuale tra 1 e 3 secondi
+        this.isForcing = false; // Stato per forzare l'incrocio quando frustrati
+    }
+
+    getBounds() {
+        return {
+            left: this.x - this.width/2,
+            right: this.x + this.width/2,
+            top: this.y - this.height/2,
+            bottom: this.y + this.height/2
+        };
+    }
+
+    update(allCars) {
+        if (this.crashed) return;
+
+        let frontCarDetected = false;
+        let intersectionYield = false;
+        let targetSpeed = MAX_SPEED;
+
+        // Trova l'incrocio più vicino
+        let myNearestX = ROADS_X[0], myNearestY = ROADS_Y[0];
+        let minDist = 9999;
+        ROADS_X.forEach(rx => {
+            ROADS_Y.forEach(ry => {
+                let d = Math.sqrt(Math.pow(rx - this.x, 2) + Math.pow(ry - this.y, 2));
+                if(d < minDist) { minDist = d; myNearestX = rx; myNearestY = ry; }
+            });
+        });
+
+        let distToInter = minDist;
+        let inIntersection = distToInter < 60; 
+
+        // Se siamo dentro l'incrocio, resettiamo la "forzatura", abbiamo già fatto il prepotente
+        if (inIntersection) {
+            this.isForcing = false; 
+        }
+
+        allCars.forEach(other => {
+            if (other === this || other.crashed || other.markedForDeletion) return;
+
+            // 1. RILEVAMENTO FRONTALE (Questo non si ignora MAI, evita i tamponamenti)
+            let dx = other.x - this.x;
+            let dy = other.y - this.y;
+            let inFront = false;
+
+            if (this.dir === 0 && dx > 0 && dx < DETECTION_DIST && Math.abs(dy) < 22) inFront = true;
+            if (this.dir === 2 && dx < 0 && dx > -DETECTION_DIST && Math.abs(dy) < 22) inFront = true;
+            if (this.dir === 1 && dy > 0 && dy < DETECTION_DIST && Math.abs(dx) < 22) inFront = true;
+            if (this.dir === 3 && dy < 0 && dy > -DETECTION_DIST && Math.abs(dx) < 22) inFront = true;
+
+            if (inFront) {
+                frontCarDetected = true;
+                targetSpeed = Math.min(targetSpeed, other.speed * 0.85);
+            }
+
+            // 2. PRECEDENZE ALL'INCROCIO (Si ignora se l'auto è "Forcing")
+            if (!inIntersection && distToInter < 130 && !this.isForcing) {
+                let otherDist = Math.sqrt(Math.pow(myNearestX - other.x, 2) + Math.pow(myNearestY - other.y, 2));
+                let otherInInter = otherDist < 60;
+
+                if (otherInInter && this.dir % 2 !== other.dir % 2) {
+                    // C'è già qualcuno nell'incrocio, diamo la precedenza
+                    intersectionYield = true;
+                    targetSpeed = 0;
+                } 
+                else if (!otherInInter && otherDist < 130) {
+                    // Nessuno è nell'incrocio, calcoliamo la precedenza a DESTRA
+                    let rightDir = (this.dir + 1) % 4; // Formula corretta per la destra
+                    
+                    if (other.dir === rightDir && otherDist < distToInter + 30) {
+                        intersectionYield = true;
+                        targetSpeed = 0;
+                    }
+                }
+            }
+        });
+
+        // 3. SISTEMA ANTI-STALLO (Frustrazione Dinamica)
+        // Se siamo fermi a causa dell'incrocio (non per un'auto davanti a noi)
+        if (intersectionYield && !frontCarDetected && this.speed < 0.5) {
+            this.waitTime++;
+            if (this.waitTime > this.patience) {
+                this.isForcing = true; // "Basta, passo io!"
+                this.waitTime = 0;
+            }
+        } else if (this.speed > 1) {
+            this.waitTime = 0; // Se scorriamo fluidamente, azzeriamo la frustrazione
+        }
+
+        // Calcolo Finale Ostacolo
+        let obstacleDetected = frontCarDetected || (intersectionYield && !this.isForcing);
+
+        // Fisica e Movimento
+        if (obstacleDetected) {
+            this.speed = Math.max(targetSpeed, this.speed - BRAKE_FORCE);
+            this.isBraking = (this.speed < MAX_SPEED * 0.8);
+        } else {
+            this.speed = Math.min(MAX_SPEED, this.speed + ACCEL);
+            this.isBraking = false;
+        }
+
+        if (this.dir === 0) this.x += this.speed;
+        if (this.dir === 1) this.y += this.speed;
+        if (this.dir === 2) this.x -= this.speed;
+        if (this.dir === 3) this.y -= this.speed;
+
+        // 4. GESTIONE COLLISIONI (Distruzione e Rimozione)
+        allCars.forEach(other => {
+            if (other === this || this.markedForDeletion || other.markedForDeletion) return;
+            let b1 = this.getBounds();
+            let b2 = other.getBounds();
+            
+            // Se le hitbox collidono
+            if (!(b1.right < b2.left || b1.left > b2.right || b1.bottom < b2.top || b1.top > b2.bottom)) {
+                explosions.push({x: (this.x + other.x)/2, y: (this.y + other.y)/2, life: 40});
+                this.crashed = true;
+                other.crashed = true;
+                this.markedForDeletion = true; // BUG FIX: Rimuoviamo istantaneamente i rottami
+                other.markedForDeletion = true;
+            }
+        });
+    }
+
+    draw() {
+        if (this.markedForDeletion) return; // Non disegnare se è distrutta
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, 150);
+        grad.addColorStop(0, 'rgba(255, 255, 200, 0.3)');
+        grad.addColorStop(1, 'rgba(255, 255, 200, 0)');
+        ctx.save();
+        ctx.rotate((this.dir * Math.PI) / 2);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(10, -10); ctx.lineTo(150, -40); ctx.lineTo(150, 40); ctx.lineTo(10, 10);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
+
+        if (this.isBraking) {
+            ctx.fillStyle = '#ff0000';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = 'red';
+            if (this.dir === 0) ctx.fillRect(-this.width/2, -this.height/2, 4, this.height);
+            if (this.dir === 1) ctx.fillRect(-this.width/2, -this.height/2, this.width, 4);
+            if (this.dir === 2) ctx.fillRect(this.width/2-4, -this.height/2, 4, this.height);
+            if (this.dir === 3) ctx.fillRect(-this.width/2, this.height/2-4, this.width, 4);
+        }
+
+        ctx.restore();
+    }
+}
+
+function spawnCar() {
+    if (Math.random() < SPAWN_RATE) {
+        let dir = Math.floor(Math.random() * 4);
+        let x, y;
+        const offset = 22;
+
+        if (dir === 0) { x = -50; y = ROADS_Y[Math.floor(Math.random()*2)] + offset; }
+        if (dir === 1) { x = ROADS_X[Math.floor(Math.random()*2)] - offset; y = -50; }
+        if (dir === 2) { x = canvas.width + 50; y = ROADS_Y[Math.floor(Math.random()*2)] - offset; }
+        if (dir === 3) { x = ROADS_X[Math.floor(Math.random()*2)] + offset; y = canvas.height + 50; }
+
+        if (!cars.some(c => Math.sqrt(Math.pow(c.x-x,2)+Math.pow(c.y-y,2)) < 100)) {
+            cars.push(new Car(x, y, dir));
+        }
+    }
+}
+
+function drawGrid() {
+    ctx.fillStyle = '#111';
+    ROADS_Y.forEach(y => {
+        ctx.fillRect(0, y - ROAD_WIDTH/2, canvas.width, ROAD_WIDTH);
+    });
+    ROADS_X.forEach(x => {
+        ctx.fillRect(x - ROAD_WIDTH/2, 0, ROAD_WIDTH, canvas.height);
+    });
+
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([20, 20]);
+    ROADS_Y.forEach(y => {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    });
+    ROADS_X.forEach(x => {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+}
+
+function loop() {
+    ctx.fillStyle = 'rgba(5, 5, 5, 0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawGrid();
+    spawnCar();
+
+    // Filtra via immediatamente le auto che escono dallo schermo o si distruggono
+    cars = cars.filter(car => {
+        car.update(cars);
+        car.draw();
+        return !car.markedForDeletion && car.x > -150 && car.x < canvas.width + 150 && car.y > -150 && car.y < canvas.height + 150;
+    });
+
+    // Anima le esplosioni
+    explosions = explosions.filter(exp => {
+        ctx.fillStyle = `rgba(255, ${exp.life * 5}, 0, ${exp.life / 40})`;
+        ctx.beginPath(); 
+        ctx.arc(exp.x, exp.y, (40 - exp.life)*2, 0, Math.PI*2); 
+        ctx.fill();
+        exp.life--;
+        return exp.life > 0;
+    });
+
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
